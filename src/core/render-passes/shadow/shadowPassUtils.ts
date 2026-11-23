@@ -1,7 +1,8 @@
 import { DEG_TO_RAD, TextureSource, RenderTarget } from 'pixi.js';
 
-import type { Matrix4 } from '../../../math/matrix/Matrix4';
+import { Matrix4 } from '../../../math/matrix/Matrix4';
 import type { Light } from '../../../scene/lights/Light';
+import type { PointLight } from '../../../scene/lights/PointLight';
 import type { SpotLight } from '../../../scene/lights/SpotLight';
 import type { CameraData } from '../../CameraData';
 import type { ShadowDataGpu } from '../../gpu/ShadowRenderPassGpu';
@@ -126,6 +127,7 @@ export const MAX_SHADOW_SLOTS = MAX_SHADOW_LIGHTS * MAX_CASCADES;
  * @internal
  */
 export function cascadeCountFor(light: Light): number {
+  if (light.type === 'point') return 6;
   if (light.type !== 'directional' || light.shadow.cascades === undefined) return 1;
   return Math.min(Math.max(light.shadow.cascades, 1), MAX_CASCADES);
 }
@@ -172,6 +174,49 @@ export function updateSpotShadowMatrices(
   const far = range;
 
   lightProjectionMatrix.makePerspective(spotLight.coneAngle * 2 * DEG_TO_RAD, 1, near, far);
+
+  if (applyWebGPUZRangeFix) {
+    const te = lightProjectionMatrix.elements;
+    te[10] = far / (near - far);
+    te[14] = (far * near) / (near - far);
+  }
+}
+
+/** Cube-map face order: +X, -X, +Y, -Y, +Z, -Z, with an up vector that keeps each face upright */
+const POINT_FACES: ReadonlyArray<{ dir: { x: number; y: number; z: number }; up: { x: number; y: number; z: number } }> = [
+  { dir: { x: 1, y: 0, z: 0 }, up: { x: 0, y: -1, z: 0 } },
+  { dir: { x: -1, y: 0, z: 0 }, up: { x: 0, y: -1, z: 0 } },
+  { dir: { x: 0, y: 1, z: 0 }, up: { x: 0, y: 0, z: 1 } },
+  { dir: { x: 0, y: -1, z: 0 }, up: { x: 0, y: 0, z: -1 } },
+  { dir: { x: 0, y: 0, z: 1 }, up: { x: 0, y: -1, z: 0 } },
+  { dir: { x: 0, y: 0, z: -1 }, up: { x: 0, y: -1, z: 0 } },
+];
+
+/**
+ * One cube face of a point light's shadow: the face's world→light-space matrix and a 90° perspective
+ * from the light out to `range`. Same matrix convention as `updateSpotShadowMatrices`.
+ * @internal
+ */
+export function updatePointShadowMatrices(
+  pointLight: PointLight,
+  face: number,
+  inverseLightMatrix: Matrix4,
+  lightProjectionMatrix: Matrix4,
+  applyWebGPUZRangeFix: boolean,
+): void {
+  const e = pointLight.worldTransform.elements;
+  const eye = { x: e[12], y: e[13], z: e[14] };
+  const f = POINT_FACES[face];
+  const target = { x: eye.x + f.dir.x, y: eye.y + f.dir.y, z: eye.z + f.dir.z };
+
+  const cameraWorld = new Matrix4().lookAt(eye, target, f.up).setPosition(eye);
+  inverseLightMatrix.getInverse(cameraWorld);
+
+  const range = pointLight.range || 1000;
+  const near = Math.min(0.05, range / 10);
+  const far = range;
+
+  lightProjectionMatrix.makePerspective(Math.PI / 2, 1, near, far);
 
   if (applyWebGPUZRangeFix) {
     const te = lightProjectionMatrix.elements;

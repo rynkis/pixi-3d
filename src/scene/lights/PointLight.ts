@@ -1,4 +1,4 @@
-import { definedProps, warn } from 'pixi.js';
+import { definedProps } from 'pixi.js';
 
 import { Light } from './Light';
 import type { LightOptions } from './Light';
@@ -113,10 +113,6 @@ export class PointLight extends Light {
 
     this.range = range!;
     this.radius = radius!;
-
-    if (this.castShadow) {
-      warn('PointLight does not cast shadows; `castShadow` has no effect.');
-    }
   }
 
   /**
@@ -124,6 +120,6 @@ export class PointLight extends Light {
    * @advanced
    */
   override get canCastShadow(): boolean {
-    return false;
+    return this.castShadow;
   }
 }

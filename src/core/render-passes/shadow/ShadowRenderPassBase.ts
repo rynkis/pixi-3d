@@ -5,6 +5,7 @@ import { Box } from '../../../math/shapes/Box';
 import { Sphere } from '../../../math/shapes/Sphere';
 import { Vector3 } from '../../../math/vector/Vector3';
 import type { Light, ShadowData } from '../../../scene/lights/Light';
+import type { PointLight } from '../../../scene/lights/PointLight';
 import type { SpotLight } from '../../../scene/lights/SpotLight';
 import type { View3D } from '../../../scene/View3D';
 import { warnOnce } from '../../../utils/warnOnce';
@@ -29,6 +30,7 @@ import {
   cascadeRenderSkip,
   createShadowRenderTarget,
   updateRateFor,
+  updatePointShadowMatrices,
   updateSpotShadowMatrices,
 } from './shadowPassUtils';
 import type { CascadeSlot, ShadowQuality } from './shadowPassUtils';
@@ -283,6 +285,25 @@ export abstract class ShadowRenderPassBase<
     const forceUpdate = light._shadowRefreshRequested;
     const update = light.shadow.update;
     const bias = light.shadow.bias ?? DEFAULT_SHADOW_BIAS;
+
+    if (light.type === 'point') {
+      const point = light as PointLight;
+      for (let f = 0; f < 6; f++) {
+        const slot = this._cascadeSlot(light, f);
+        const renderSkip = cascadeRenderSkip(updateRateFor(update, 0), this._frameCount, forceUpdate);
+        if (!renderSkip) {
+          updatePointShadowMatrices(point, f, inverseLightMatrix, lightProjectionMatrix, this._applyZRangeFix);
+          this._commitCascadeCamera(slot, inverseLightMatrix, lightProjectionMatrix);
+          slot.normalBias = light.shadow.normalBias ?? 0.02;
+        }
+        slot.bias = bias;
+        slot.mapSize = mapSize;
+        slot.cascadeCount = 0;
+        slot.splits = null;
+        slot.needsRender = targetStale || !renderSkip;
+      }
+      return;
+    }
 
     if (light.type === 'spot' || light.shadow.cascades === undefined) {
       const slot = this._cascadeSlot(light, 0);

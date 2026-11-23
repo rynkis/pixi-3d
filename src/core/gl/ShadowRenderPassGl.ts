@@ -89,7 +89,7 @@ export class ShadowRenderPassGl extends ShadowRenderPassBase<View3DPipeGl, Shado
   constructor(options: ShadowRenderPassGlOptions) {
     const shadowState = stateFor3D();
     shadowState.depthTest = true;
-    shadowState.culling = true;
+    shadowState.culling = false;
     shadowState.clockwiseFrontFace = true;
     shadowState.blend = false;
 

@@ -93,6 +93,24 @@ ${pcfBody(SHADOW_TAPS[filter])}
         return 1.0;
       }
 
+      if (light.type == 1.0) {
+        vec3 pd = worldPos - light.position;
+        vec3 apd = abs(pd);
+        int face;
+        if (apd.x >= apd.y && apd.x >= apd.z) face = pd.x >= 0.0 ? 0 : 1;
+        else if (apd.y >= apd.z) face = pd.y >= 0.0 ? 2 : 3;
+        else face = pd.z >= 0.0 ? 4 : 5;
+        int pidx = baseIndex + face;
+        ShadowData psd = getShadowData(pidx);
+        vec3 pBiased = worldPos + normal * (psd.shadowParams.y * (1.0 - NdotL));
+        vec4 pLsp = psd.lightSpaceMatrix * vec4(pBiased, 1.0);
+        vec3 pProj = pLsp.xyz / pLsp.w;
+        vec2 pUv = clamp(pProj.xy * 0.5 + 0.5, 0.0, 1.0);
+        float pDepth = pProj.z * 0.5 + 0.5;
+        float pCur = pDepth - psd.shadowParams.x;
+        return texture(uShadowMap, vec4(pUv, float(pidx), pCur));
+      }
+
       ShadowData base = getShadowData(baseIndex);
       int last = int(base.shadowParams.w) - 1;
 
