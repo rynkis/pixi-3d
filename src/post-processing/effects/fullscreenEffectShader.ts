@@ -20,6 +20,8 @@ export const fxhBit: ShaderBit = {
       uFxTexel: 'vec4<f32>',
       uFxInputClamp: 'vec4<f32>',
       uFxInput2Clamp: 'vec4<f32>',
+      uFxInput3Clamp: 'vec4<f32>',
+      uFxInput4Clamp: 'vec4<f32>',
     },
   },
   gpu: {
@@ -126,6 +128,59 @@ fn sampleColor2(uv: vec2<f32>) -> vec4<f32> {
     header: /* glsl */ `
 vec4 sampleColor2(vec2 uv) {
   return textureLod(uTexture2, fxInputUv(uv, uFxInput2Clamp), 0.0);
+}
+`,
+  },
+};
+
+/**
+ * Third and fourth colour inputs for effects whose composite pass samples more than two textures
+ * (e.g. a depth-of-field composite reading colour, near, far and coc). Same contract as `colorReadBit`.
+ * @internal
+ */
+export const color3ReadBit: ShaderBit = {
+  name: 'effectColor3Read',
+  bindings: {
+    fx: {
+      uTexture3: 'texture_2d<f32>',
+      uTexture3Sampler: 'sampler',
+    },
+  },
+  gpu: {
+    header: /* wgsl */ `
+fn sampleColor3(uv: vec2<f32>) -> vec4<f32> {
+  return textureSampleLevel(uTexture3, uTexture3Sampler, fxInputUv(uv, fxh.uFxInput3Clamp), 0.0);
+}
+`,
+  },
+  gl: {
+    header: /* glsl */ `
+vec4 sampleColor3(vec2 uv) {
+  return textureLod(uTexture3, fxInputUv(uv, uFxInput3Clamp), 0.0);
+}
+`,
+  },
+};
+
+export const color4ReadBit: ShaderBit = {
+  name: 'effectColor4Read',
+  bindings: {
+    fx: {
+      uTexture4: 'texture_2d<f32>',
+      uTexture4Sampler: 'sampler',
+    },
+  },
+  gpu: {
+    header: /* wgsl */ `
+fn sampleColor4(uv: vec2<f32>) -> vec4<f32> {
+  return textureSampleLevel(uTexture4, uTexture4Sampler, fxInputUv(uv, fxh.uFxInput4Clamp), 0.0);
+}
+`,
+  },
+  gl: {
+    header: /* glsl */ `
+vec4 sampleColor4(vec2 uv) {
+  return textureLod(uTexture4, fxInputUv(uv, uFxInput4Clamp), 0.0);
 }
 `,
   },

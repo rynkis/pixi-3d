@@ -12,6 +12,8 @@ import type { BindingGroup, ShaderBit } from '../../core/shader/ShaderBit';
 import { DEPTH_VIEW_PLACEHOLDER } from '../../core/textures/DefaultTextures';
 import {
   color2ReadBit,
+  color3ReadBit,
+  color4ReadBit,
   colorReadBit,
   depthReadBitGl,
   depthReadBitGpu,
@@ -57,6 +59,10 @@ export interface FullscreenPassOptions {
     color?: ColorHandle;
     /** Second colour input, read with `sampleColor2` */
     color2?: ColorHandle;
+    /** Third colour input, read with `sampleColor3` */
+    color3?: ColorHandle;
+    /** Fourth colour input, read with `sampleColor4` */
+    color4?: ColorHandle;
     /** Scene depth, read with `sampleDepth`, `viewPos` and `depthTexel` */
     depth?: DepthHandle;
   };
@@ -133,6 +139,8 @@ interface FxBindings {
   group: BindGroup;
   color: TextureBinding | null;
   color2: TextureBinding | null;
+  color3: TextureBinding | null;
+  color4: TextureBinding | null;
   depth: TextureBinding | null;
 }
 
@@ -155,6 +163,14 @@ function createFxBindings(
     entries.uTexture2 = Texture.WHITE.source;
     entries.uTexture2Sampler = new TextureStyle({ scaleMode: 'linear', addressMode: 'clamp-to-edge' });
   }
+  if (reads.color3) {
+    entries.uTexture3 = Texture.WHITE.source;
+    entries.uTexture3Sampler = new TextureStyle({ scaleMode: 'linear', addressMode: 'clamp-to-edge' });
+  }
+  if (reads.color4) {
+    entries.uTexture4 = Texture.WHITE.source;
+    entries.uTexture4Sampler = new TextureStyle({ scaleMode: 'linear', addressMode: 'clamp-to-edge' });
+  }
   if (reads.depth) entries.uFxDepthTexture = DEPTH_VIEW_PLACEHOLDER;
 
   const group = new BindGroup(entries);
@@ -162,6 +178,8 @@ function createFxBindings(
     group,
     color: reads.color ? { group, slot: 'uTexture' } : null,
     color2: reads.color2 ? { group, slot: 'uTexture2' } : null,
+    color3: reads.color3 ? { group, slot: 'uTexture3' } : null,
+    color4: reads.color4 ? { group, slot: 'uTexture4' } : null,
     depth: reads.depth ? { group, slot: 'uFxDepthTexture' } : null,
   };
 }
@@ -196,6 +214,8 @@ export class FullscreenPass extends RenderPass {
   private readonly _fxhUniforms: UniformGroup;
   private readonly _colorBinding: TextureBinding | null;
   private readonly _color2Binding: TextureBinding | null;
+  private readonly _color3Binding: TextureBinding | null;
+  private readonly _color4Binding: TextureBinding | null;
   private readonly _depthBinding: TextureBinding | null;
 
   private _shader: Shader | null = null;
@@ -223,6 +243,8 @@ export class FullscreenPass extends RenderPass {
     this._fxBindGroup = fx.group;
     this._colorBinding = fx.color;
     this._color2Binding = fx.color2;
+    this._color3Binding = fx.color3;
+    this._color4Binding = fx.color4;
     this._depthBinding = fx.depth;
 
     this._fxhUniforms = new UniformGroup({
@@ -230,6 +252,8 @@ export class FullscreenPass extends RenderPass {
       uFxTexel: { value: new Float32Array(4), type: 'vec4<f32>' },
       uFxInputClamp: { value: new Float32Array(WHOLE_TEXTURE_CLAMP), type: 'vec4<f32>' },
       uFxInput2Clamp: { value: new Float32Array(WHOLE_TEXTURE_CLAMP), type: 'vec4<f32>' },
+      uFxInput3Clamp: { value: new Float32Array(WHOLE_TEXTURE_CLAMP), type: 'vec4<f32>' },
+      uFxInput4Clamp: { value: new Float32Array(WHOLE_TEXTURE_CLAMP), type: 'vec4<f32>' },
     });
     this._fxhBindGroup = new BindGroup({ fxh: this._fxhUniforms });
   }
@@ -244,6 +268,8 @@ export class FullscreenPass extends RenderPass {
   public override setup(b: PassBuilder): void {
     if (this._reads.color) b.sample(this._reads.color, this._colorBinding!);
     if (this._reads.color2) b.sample(this._reads.color2, this._color2Binding!);
+    if (this._reads.color3) b.sample(this._reads.color3, this._color3Binding!);
+    if (this._reads.color4) b.sample(this._reads.color4, this._color4Binding!);
     if (this._reads.depth) b.sample(this._reads.depth, this._depthBinding!);
 
     if (this._writes) {
@@ -297,6 +323,12 @@ export class FullscreenPass extends RenderPass {
     if (this._reads.color2) {
       graph._inputClamp(this._reads.color2, session, this._fxhUniforms.uniforms.uFxInput2Clamp as Float32Array);
     }
+    if (this._reads.color3) {
+      graph._inputClamp(this._reads.color3, session, this._fxhUniforms.uniforms.uFxInput3Clamp as Float32Array);
+    }
+    if (this._reads.color4) {
+      graph._inputClamp(this._reads.color4, session, this._fxhUniforms.uniforms.uFxInput4Clamp as Float32Array);
+    }
     this._fxhUniforms.update();
   }
 
@@ -304,6 +336,8 @@ export class FullscreenPass extends RenderPass {
     const bits: ShaderBit[] = [fxhBit];
     if (this._reads.color) bits.push(colorReadBit);
     if (this._reads.color2) bits.push(color2ReadBit);
+    if (this._reads.color3) bits.push(color3ReadBit);
+    if (this._reads.color4) bits.push(color4ReadBit);
     if (this._reads.depth) bits.push(this._isWebGL ? depthReadBitGl : depthReadBitGpu);
     bits.push(getFragmentBit(this._fragment, this._uniforms), ...this._extraBits);
 
