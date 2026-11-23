@@ -1,0 +1,6 @@
+packages:
+  - playground
+  - examples/racing
+  - scripts/typedoc
+allowBuilds:
+  esbuild: true
