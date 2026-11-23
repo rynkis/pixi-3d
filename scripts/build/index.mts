@@ -28,7 +28,7 @@ const isBackend = (file: string): boolean => BACKENDS.some((backend) => file.sta
 function writeBarrel(directory: string, name: string, files: string[]): void {
   const output = [
     '// Auto-generated code, do not edit manually',
-    ...files.map((file) => `export * from './${file.replace(/\.ts$/, '')}';`),
+    ...files.map((file) => `export * from './${file.replace(/\\/g, '/').replace(/\.ts$/, '')}';`),
     '',
   ].join('\n');
   const filePath = path.join(directory, name);

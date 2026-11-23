@@ -52,19 +52,13 @@ const config: UserConfig = {
   platform: 'browser',
 };
 
-export default defineConfig([
-  {
-    ...config,
-    dts: true,
-  },
-  {
-    ...config,
-    failOnWarn: true,
-    dts: false,
-    hooks: {
-      'build:prepare': async () => {
-        await spawn('node', ['scripts/build/index.mts', '--write']);
-      },
+export default defineConfig({
+  ...config,
+  failOnWarn: true,
+  dts: false,
+  hooks: {
+    'build:prepare': async () => {
+      await spawn('node', ['scripts/build/index.mts', '--write']);
     },
   },
-]);
+});

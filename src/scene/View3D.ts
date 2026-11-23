@@ -362,6 +362,12 @@ export interface View3DOptions<TRoot extends Container3D = Container3D>
    */
   exposure?: number;
   /**
+   * Extra blur radius multiplier for PCF shadow edges; PCF tap offsets scale by it. Changing it
+   * recompiles the materials on the next frame, like {@link View3D#shadowFilter | shadowFilter}.
+   * @default 1
+   */
+  shadowBlur?: number;
+  /**
    * Distance fog, left out for none; see {@link View3D#fog}
    * @example
    * ```ts
@@ -538,6 +544,7 @@ export class View3D<TRoot extends Container3D = Container3D> extends ViewContain
     anchor: 0,
     shadowQuality: 'medium',
     shadowFilter: 'pcf',
+    shadowBlur: 1,
     toneMapping: 'none',
     exposure: 1.0,
     autoResize: false,
@@ -665,6 +672,7 @@ export class View3D<TRoot extends Container3D = Container3D> extends ViewContain
    */
   public shadowQuality: ShadowQuality;
   private _shadowFilter: ShadowFilter = 'pcf';
+  private _shadowBlur = 1;
   /**
    * Brightness multiplier for the whole scene, background and fog included, applied before tone
    * mapping
@@ -822,6 +830,7 @@ export class View3D<TRoot extends Container3D = Container3D> extends ViewContain
       anchor,
       shadowQuality,
       shadowFilter,
+      shadowBlur,
       environment,
       background,
       toneMapping,
@@ -841,6 +850,7 @@ export class View3D<TRoot extends Container3D = Container3D> extends ViewContain
 
     this.shadowQuality = shadowQuality!;
     this._shadowFilter = shadowFilter!;
+    this._shadowBlur = shadowBlur!;
     this.environment = environment ?? null;
     this.background = background ?? null;
     this._toneMapping = toneMapping!;
@@ -1346,6 +1356,21 @@ export class View3D<TRoot extends Container3D = Container3D> extends ViewContain
   public set shadowFilter(value: ShadowFilter) {
     if (this._shadowFilter === value) return;
     this._shadowFilter = value;
+    this._invalidateMaterialShaders();
+  }
+
+  /**
+   * Extra blur radius multiplier for the shadow edges this view draws, on top of the
+   * {@link View3D#shadowFilter | shadowFilter} taps. `1` keeps the filter's size, higher blurs wider.
+   * @default 1
+   */
+  public get shadowBlur(): number {
+    return this._shadowBlur;
+  }
+
+  public set shadowBlur(value: number) {
+    if (this._shadowBlur === value) return;
+    this._shadowBlur = value;
     this._invalidateMaterialShaders();
   }
 

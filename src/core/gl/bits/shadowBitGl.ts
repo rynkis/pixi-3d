@@ -13,7 +13,7 @@ function fmt(n: number): string {
 function pcfBody(taps: readonly ShadowTap[]): string {
   const spread = taps.some(([x, y]) => x !== 0 || y !== 0);
   const tap = ([x, y]: ShadowTap): string =>
-    x === 0 && y === 0 ? 'uv' : `uv + vec2(${fmt(x)}, ${fmt(y)}) * texelSize`;
+    x === 0 && y === 0 ? 'uv' : `uv + vec2(${fmt(x)}, ${fmt(y)}) * texelSize * SHADOW_BLUR`;
 
   const lines: string[] = ['      float currentDepth = depth - params.x;'];
   if (spread) lines.push('      float texelSize = 1.0 / params.z;');
@@ -36,6 +36,9 @@ function pcfBody(taps: readonly ShadowTap[]): string {
 function createShadowBitGl(filter: ShadowFilter): ShaderBit {
   return {
     name: `shadowGl:${filter}`,
+    overrideDefs: {
+      SHADOW_BLUR: { type: 'f32', default: 1 },
+    },
     structs: {
       ShadowData: ShadowDataStructGl,
     },

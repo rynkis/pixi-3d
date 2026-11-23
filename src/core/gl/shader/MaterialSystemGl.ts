@@ -386,6 +386,7 @@ export class MaterialSystemGl {
       template: materialDescriptor.template ?? template,
       overrides: {
         HAS_UVS: geo.attributes.aUV ? 1 : 0,
+        SHADOW_BLUR: view3d.shadowBlur,
         ...materialDescriptor.overrides,
       },
       outputLocations,

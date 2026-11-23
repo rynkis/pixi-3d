@@ -8,6 +8,9 @@ import type { RenderSession } from '../render-passes/RenderSession';
 import { cascadeCountFor, castsShadowThisFrame } from '../render-passes/shadow/shadowPassUtils';
 import { ShadowRenderPassBase } from '../render-passes/shadow/ShadowRenderPassBase';
 import { instanceFetchBitGl } from '../shader/bits/instanceFetchBitGl';
+import { materialBindingsBit } from '../shader/bits/materialBindingsBit';
+import { getUvsBit } from '../shader/bits/uvsBit';
+import type { ShaderBit } from '../shader/ShaderBit';
 import type { ShaderBitTemplate } from '../shader/ShaderBitTemplate';
 import { shadowGlobalBitGl } from './shader/shadowGlobalBitGl';
 import type { View3DPipeGl } from './View3DPipeGl';
@@ -16,6 +19,24 @@ interface ShadowRenderPassGlOptions {
   renderer: WebGLRenderer;
   shadowMapHandle: DepthHandle;
 }
+
+/**
+ * Cuts out transparent texels so a textured quad (character / panel billboard) casts an alpha
+ * silhouette rather than a full rectangle. Reads the mesh's own baseColor texture via the batch
+ * material bindings; the cutoff is fixed since the shadow only needs opaque-vs-transparent.
+ */
+const shadowAlphaCutoutBit: ShaderBit = {
+  name: 'shadowAlphaCutout',
+  interStage: { vUV: 'vec2<f32>' },
+  textures: ['baseColor'],
+  gl: {
+    fragment: {
+      material: /* glsl */ `
+  if (texture(uMaterialTexture0, vUV).a < 0.5) discard;
+`,
+    },
+  },
+};
 
 /** Declares `normal` and `tangent`, which depth doesn't need, because the skinning and morph bits write them */
 const shadowGlVertexTemplate = `#version 300 es
@@ -28,11 +49,14 @@ void main() {
   vec4 position;
   vec3 normal = vec3(0.0);
   vec3 tangent = vec3(0.0);
+  vec2 uv = vec2(0.0);
 
   {{input}}
 
   vec4 worldPosition = modelMatrix * position;
   gl_Position = uViewProjectionMatrix * worldPosition;
+
+  vUV = uv;
 
   {{end}}
 }`;
@@ -43,11 +67,13 @@ out vec4 fragColor;
 {{header}}
 
 void main() {
+    {{material}}
+
     fragColor = vec4(0.);
 }`;
 
 const shadowTemplateGl: ShaderBitTemplate = {
-  bindGroups: [{ name: 'global', ubo: true }, 'camera'],
+  bindGroups: [{ name: 'global', ubo: true }, 'camera', 'batch'],
   gl: {
     vertex: shadowGlVertexTemplate,
     fragment: shadowGlFragmentTemplate,
@@ -75,9 +101,16 @@ export class ShadowRenderPassGl extends ShadowRenderPassBase<View3DPipeGl, Shado
       shadowMapHandle: options.shadowMapHandle,
       descriptor: {
         shaderDescriptor: {
-          bitsGl: [shadowGlobalBitGl, instanceFetchBitGl],
+          bitsGl: [
+            shadowGlobalBitGl,
+            instanceFetchBitGl,
+            getUvsBit('float32x2'),
+            materialBindingsBit([shadowAlphaCutoutBit], 'merged'),
+            shadowAlphaCutoutBit,
+          ],
           template: shadowTemplateGl,
           includeGlobal: false,
+          overrides: { HAS_UVS: 1 },
         },
         state: shadowState,
       },
@@ -122,7 +155,7 @@ export class ShadowRenderPassGl extends ShadowRenderPassBase<View3DPipeGl, Shado
           list: list,
           globalBindGroup: bindGroup,
           passBit: this.bit,
-          bindsMaterial: false,
+          bindsMaterial: true,
         });
       }
     }
